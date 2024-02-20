@@ -14,7 +14,7 @@ function compress(imagePath, useWebp, grayscale, quality, originalSize) {
         "content-type": `image/${format}`,
         "content-length": info.size,
         "x-original-size": originalSize,
-        "x-bytes-saved": originalSize - info.size,
+        // "x-bytes-saved": originalSize - info.size,
       },
       output: data,
     }))
