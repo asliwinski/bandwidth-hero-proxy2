@@ -1,5 +1,4 @@
 const pick = require("../util/pick"),
-  fetch = require("node-fetch"),
   shouldCompress = require("../util/shouldCompress"),
   compress = require("../util/compress"),
   DEFAULT_QUALITY = 40;
@@ -29,7 +28,7 @@ exports.handler = async (e, t) => {
         e.ok
           ? ((h = e.headers),
             {
-              data: await e.buffer(),
+              data: await e.arrayBuffer(),
               type: e.headers.get("content-type") || "",
             })
           : { statusCode: e.status || 302 },
