@@ -25,7 +25,7 @@ async function handler(event: HandlerEvent) {
   // Replace specific pattern in the URL
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  const useWebp = !Boolean(jpeg);
+  const useWebp = jpeg === undefined || jpeg === "0";
   const grayscale = bw !== "0";
   const quality = parseInt(l, 10) || 40;
 
