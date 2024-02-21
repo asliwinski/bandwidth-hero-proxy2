@@ -11,6 +11,7 @@ function compress(imagePath, useWebp, grayscale, quality, originalSize) {
     .then(({ data, info }) => ({
       err: null,
       headers: {
+        "cache-control": "max-age=2592000",
         "content-type": `image/${format}`,
         "content-length": info.size,
         "x-original-size": originalSize,
