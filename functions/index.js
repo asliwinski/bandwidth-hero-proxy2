@@ -33,10 +33,10 @@ exports.handler = async (e, t) => {
             })
           : { statusCode: e.status || 302 },
       ),
-      p = c.length;
+      p = c.byteLength;
     if (!shouldCompress(l, p, d))
       return (
-        console.log("Bypassing... Size: ", c.length),
+        console.log("Bypassing... Size: ", c.byteLength),
         {
           statusCode: 200,
           body: c.toString("base64"),
