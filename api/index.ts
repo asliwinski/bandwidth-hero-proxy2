@@ -1,6 +1,7 @@
 import pick from "../util/pick";
 import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
 
@@ -110,7 +111,90 @@ async function compressData(
 }
 
 export { handler };
-export default function (request, response) {
-  const { name = "World" } = request.query;
-  return response.send(`Hello ${name}!`);
+export default async function (
+  request: VercelRequest,
+  response: VercelResponse,
+) {
+  let { url, jpeg, bw, l } = request.query;
+
+  // If no URL provided, return a default response
+  if (!url) {
+    return response.status(200).send("bandwidth-hero-proxy");
+  }
+
+  // Parse URL if it's in JSON format
+  try {
+    if (typeof url === "string") {
+      url = JSON.parse(url);
+    }
+  } catch {}
+
+  // If URL is an array, join it with "&url="
+  if (Array.isArray(url)) {
+    url = url.join("&url=");
+  }
+
+  // Replace specific pattern in the URL
+  url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
+
+  const useWebp = jpeg === undefined || jpeg === "0";
+  const grayscale = bw !== "0";
+  let quality = 40;
+  if (typeof l === "string") {
+    quality = parseInt(l, 10);
+  }
+
+  try {
+    let requestHeaders = pick(request.headers, [
+      "cookie",
+      "dnt",
+      "referer",
+      "user-agent",
+      "x-forwarded-for",
+    ]);
+
+    const { data, type, headers } = await fetchData(url, requestHeaders);
+
+    const originalSize = data.byteLength;
+
+    if (!shouldCompress(type, originalSize, useWebp)) {
+      console.log("Bypassing... Size: ", data.byteLength);
+      return {
+        statusCode: 200,
+        body: data.toString(),
+        isBase64Encoded: true,
+        headers,
+      };
+    }
+
+    const { output, compressedHeaders } = await compressData(
+      data,
+      useWebp,
+      grayscale,
+      quality,
+      originalSize,
+    );
+
+    console.log(
+      `From ${originalSize}, Saved: ${(originalSize - output.length) / originalSize}%`,
+    );
+
+    // let body = output.toString("base64");
+
+    // @ts-ignore
+    [...headers, ...compressedHeaders].forEach((header) =>
+      response.setHeader(header.name, header.value),
+    );
+    response.status(200).send(output);
+
+    // return {
+    //   statusCode: 200,
+    //   body: body,
+    //   isBase64Encoded: true,
+    //   headers: { ...headers, ...compressedHeaders },
+    // };
+  } catch (error) {
+    console.error(error);
+    return { statusCode: 500, body: error.message || "" };
+  }
 }
