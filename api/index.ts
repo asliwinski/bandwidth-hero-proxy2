@@ -181,10 +181,12 @@ export default async function (
 
     // let body = output.toString("base64");
 
-    // @ts-ignore
-    [...headers, ...compressedHeaders].forEach((header) =>
-      response.setHeader(header.name, header.value),
-    );
+    const finalHeaders = { ...headers, ...compressedHeaders };
+
+    for (const header in finalHeaders) {
+      response.setHeader(header, finalHeaders[header]);
+    }
+
     response.status(200).send(output);
 
     // return {
