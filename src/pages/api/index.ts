@@ -1,6 +1,6 @@
-import pick from "../util/pick";
-import shouldCompress from "../util/shouldCompress";
-import compress from "../util/compress";
+import pick from "../../../util/pick";
+import shouldCompress from "../../../util/shouldCompress";
+import compress from "../../../util/compress";
 
 import type { HandlerEvent } from "@netlify/functions";
 
