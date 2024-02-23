@@ -1,7 +1,7 @@
 [functions]
-    directory = "src/pages/api/"
+    directory = "api/"
 
 [[redirects]]
     from = "/api/*"
-    to = "/.netlify/src/pages/api/:splat"
+    to = "/.netlify/functions/:splat"
     status = 200
