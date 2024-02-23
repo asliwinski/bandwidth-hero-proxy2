@@ -110,3 +110,4 @@ async function compressData(
 }
 
 export { handler };
+export default handler;
