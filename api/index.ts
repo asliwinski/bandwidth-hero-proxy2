@@ -159,12 +159,12 @@ export default async function (
 
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log("Bypassing... Size: ", data.byteLength);
-      return {
-        statusCode: 200,
-        body: data.toString(),
-        isBase64Encoded: true,
-        headers,
-      };
+
+      for (const header in headers) {
+        response.setHeader(header, headers[header]);
+      }
+
+      return response.status(200).send(data);
     }
 
     const { output, compressedHeaders } = await compressData(
