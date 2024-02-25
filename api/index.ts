@@ -5,12 +5,26 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
 
+function assembleURL(baseURL, queryParams) {
+  const url = new URL(baseURL);
+
+  Object.keys(queryParams).forEach((key) => {
+    url.searchParams.append(key, queryParams[key]);
+  });
+
+  return url.toString();
+}
+
 async function handler(event: HandlerEvent) {
-  let { url, jpeg, bw, l } = event.queryStringParameters;
+  let { url, ...rest } = event.queryStringParameters;
 
   // If no URL provided, return a default response
   if (!url) {
     return { statusCode: 200, body: "bandwidth-hero-proxy" };
+  }
+
+  if (rest) {
+    url = assembleURL(url, rest);
   }
 
   // Parse URL if it's in JSON format
@@ -26,9 +40,19 @@ async function handler(event: HandlerEvent) {
   // Replace specific pattern in the URL
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  const useWebp = jpeg === undefined || jpeg === "0";
-  const grayscale = bw !== "0";
-  const quality = parseInt(l, 10) || 40;
+  let useWebp = false;
+  let grayscale = true;
+  let quality = 40;
+
+  if (
+    event.headers["x-image-lite-bw"] &&
+    event.headers["x-image-lite-level"] &&
+    event.headers["x-image-lite-jpeg"]
+  ) {
+    useWebp = event.headers["x-image-lite-jpeg"] === "0";
+    grayscale = event.headers["x-image-lite-bw"] !== "0";
+    quality = parseInt(event.headers["x-image-lite-level"], 10) || 40;
+  }
 
   try {
     let requestHeaders = pick(event.headers, [
@@ -115,11 +139,15 @@ export default async function (
   request: VercelRequest,
   response: VercelResponse,
 ) {
-  let { url, jpeg, bw, l } = request.query;
+  let { url, ...rest } = request.query;
 
   // If no URL provided, return a default response
   if (!url) {
     return response.status(200).send("bandwidth-hero-proxy");
+  }
+
+  if (rest) {
+    url = assembleURL(url, rest);
   }
 
   // Parse URL if it's in JSON format
@@ -137,11 +165,19 @@ export default async function (
   // Replace specific pattern in the URL
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  const useWebp = jpeg === undefined || jpeg === "0";
-  const grayscale = bw !== "0";
+  let useWebp = false;
+  let grayscale = true;
   let quality = 40;
-  if (typeof l === "string") {
-    quality = parseInt(l, 10);
+
+  if (
+    request.headers["x-image-lite-bw"] &&
+    request.headers["x-image-lite-level"] &&
+    request.headers["x-image-lite-jpeg"]
+  ) {
+    useWebp = request.headers["x-image-lite-jpeg"] === "0";
+    grayscale = request.headers["x-image-lite-bw"] !== "0";
+    quality =
+      parseInt(request.headers["x-image-lite-level"] as string, 10) || 40;
   }
 
   try {
