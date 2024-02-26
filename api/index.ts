@@ -5,6 +5,31 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
 
+function patchContentSecurity(headers: Headers, host: string): Headers {
+  const finalHeaders = new Headers();
+
+  const hostWithProtocol = "https://" + host;
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (/content-security-policy/i.test(name)) {
+      const patchedValue = stripMixedContentCSP(value)
+        .replace("img-src", `img-src ${hostWithProtocol}`)
+        .replace("default-src", `default-src ${hostWithProtocol}`)
+        .replace("connect-src", `connect-src ${hostWithProtocol}`);
+
+      finalHeaders[name] = patchedValue;
+    } else {
+      finalHeaders[name] = value;
+    }
+  }
+
+  return finalHeaders;
+}
+
+function stripMixedContentCSP(CSPHeader) {
+  return CSPHeader.replace("block-all-mixed-content", "");
+}
+
 function assembleURL(baseURL, queryParams) {
   const url = new URL(baseURL);
 
@@ -73,7 +98,7 @@ async function handler(event: HandlerEvent) {
         statusCode: 200,
         body: data.toString(),
         isBase64Encoded: true,
-        headers,
+        headers: patchContentSecurity(headers, event.headers.host),
       };
     }
 
@@ -95,7 +120,10 @@ async function handler(event: HandlerEvent) {
       statusCode: 200,
       body: body,
       isBase64Encoded: true,
-      headers: { ...headers, ...compressedHeaders },
+      headers: patchContentSecurity(
+        { ...headers, ...compressedHeaders },
+        event.headers.host,
+      ),
     };
   } catch (error) {
     console.error(error);
@@ -196,7 +224,7 @@ export default async function (
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log("Bypassing... Size: ", data.byteLength);
 
-      for (const header in headers) {
+      for (const header in patchContentSecurity(headers, requestHeaders.host)) {
         response.setHeader(header, headers[header]);
       }
 
@@ -217,7 +245,10 @@ export default async function (
 
     // let body = output.toString("base64");
 
-    const finalHeaders = { ...headers, ...compressedHeaders };
+    const finalHeaders = patchContentSecurity(
+      { ...headers, ...compressedHeaders },
+      requestHeaders.host,
+    );
 
     for (const header in finalHeaders) {
       response.setHeader(header, finalHeaders[header]);
