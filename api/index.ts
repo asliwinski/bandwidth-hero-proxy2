@@ -224,7 +224,10 @@ export default async function (
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log("Bypassing... Size: ", data.byteLength);
 
-      for (const header in patchContentSecurity(headers, requestHeaders.host)) {
+      for (const header in patchContentSecurity(
+        headers,
+        request.headers.host,
+      )) {
         response.setHeader(header, headers[header]);
       }
 
@@ -247,7 +250,7 @@ export default async function (
 
     const finalHeaders = patchContentSecurity(
       { ...headers, ...compressedHeaders },
-      requestHeaders.host,
+      request.headers.host,
     );
 
     for (const header in finalHeaders) {
