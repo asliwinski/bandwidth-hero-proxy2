@@ -5,8 +5,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
 
-function patchContentSecurity(headers: Headers, host: string): Headers {
-  const finalHeaders = new Headers();
+function patchContentSecurity(headers: Headers, host: string) {
+  const finalHeaders = {};
 
   const hostWithProtocol = "https://" + host;
 
@@ -26,7 +26,7 @@ function patchContentSecurity(headers: Headers, host: string): Headers {
   return finalHeaders;
 }
 
-function stripMixedContentCSP(CSPHeader) {
+function stripMixedContentCSP(CSPHeader: string) {
   return CSPHeader.replace("block-all-mixed-content", "");
 }
 
@@ -224,11 +224,10 @@ export default async function (
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log("Bypassing... Size: ", data.byteLength);
 
-      for (const header in patchContentSecurity(
-        headers,
-        request.headers.host,
-      )) {
-        response.setHeader(header, headers[header]);
+      const finalHeaders = patchContentSecurity(headers, request.headers.host);
+
+      for (const header in finalHeaders) {
+        response.setHeader(header, finalHeaders[header]);
       }
 
       return response.status(200).send(data);
