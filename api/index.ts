@@ -1,3 +1,4 @@
+import { Readable } from "stream";
 import pick from "../util/pick";
 import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
@@ -5,12 +6,21 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
 
+function arrayBufferToStream(arrayBuffer: ArrayBuffer) {
+  return new Readable({
+    read() {
+      this.push(Buffer.from(arrayBuffer));
+      this.push(null);
+    },
+  });
+}
+
 function patchContentSecurity(headers: Headers, host: string) {
   const finalHeaders = {};
 
   const hostWithProtocol = "https://" + host;
 
-  for (const [name, value] of Object.entries(headers)) {
+  for (const [name, value] of new Headers(headers)) {
     if (/content-security-policy/i.test(name)) {
       const patchedValue = stripMixedContentCSP(value)
         .replace("img-src", `img-src ${hostWithProtocol}`)
@@ -96,8 +106,7 @@ async function handler(event: HandlerEvent) {
       console.log("Bypassing... Size: ", data.byteLength);
       return {
         statusCode: 200,
-        body: data.toString(),
-        isBase64Encoded: true,
+        body: arrayBufferToStream(data),
         headers: patchContentSecurity(headers, event.headers.host),
       };
     }
