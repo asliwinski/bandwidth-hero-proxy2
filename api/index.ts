@@ -98,7 +98,10 @@ async function handler(event: HandlerEvent) {
       "x-forwarded-for",
     ]);
 
-    const { data, type, headers } = await fetchData(url, requestHeaders);
+    const { data, type, headers, response } = await fetchData(
+      url,
+      requestHeaders,
+    );
 
     const originalSize = data.byteLength;
 
@@ -106,8 +109,9 @@ async function handler(event: HandlerEvent) {
       console.log("Bypassing... Size: ", data.byteLength);
       return {
         statusCode: 200,
-        body: arrayBufferToStream(data),
+        body: data.toString("base64"),
         headers: patchContentSecurity(headers, event.headers.host),
+        isBase64Encoded: true,
       };
     }
 
@@ -147,7 +151,7 @@ async function fetchData(url: string, headers: Headers) {
   }
   const data = await response.arrayBuffer();
   const type = response.headers.get("content-type") || "";
-  return { data, type, headers: response.headers };
+  return { data, type, headers: response.headers, response };
 }
 
 async function compressData(
