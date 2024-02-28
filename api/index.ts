@@ -107,9 +107,10 @@ async function handler(event: HandlerEvent) {
 
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log("Bypassing... Size: ", data.byteLength);
+
       return {
         statusCode: 200,
-        body: data.toString("base64"),
+        body: Buffer.from(data).toString("base64"),
         headers: patchContentSecurity(headers, event.headers.host),
         isBase64Encoded: true,
       };
