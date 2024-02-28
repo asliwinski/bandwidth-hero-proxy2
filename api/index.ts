@@ -244,7 +244,7 @@ export default async function (
         response.setHeader(header, finalHeaders[header]);
       }
 
-      return response.status(200).send(data);
+      return response.status(200).send(Buffer.from(data).toString("base64"));
     }
 
     const { output, compressedHeaders } = await compressData(
