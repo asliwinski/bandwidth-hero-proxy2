@@ -125,7 +125,7 @@ async function handler(event: HandlerEvent) {
     );
 
     console.log(
-      `From ${originalSize}, Saved: ${(originalSize - output.length) / originalSize}%`,
+      `From ${originalSize}, To ${output.length}, Saved: ${(((originalSize - output.length) * 100) / originalSize).toFixed(0)}%`,
     );
 
     let body = output.toString("base64");
@@ -256,7 +256,7 @@ export default async function (
     );
 
     console.log(
-      `From ${originalSize}, Saved: ${(originalSize - output.length) / originalSize}%`,
+      `From ${originalSize}, To ${output.length}, Saved: ${(((originalSize - output.length) * 100) / originalSize).toFixed(0)}%`,
     );
 
     // let body = output.toString("base64");
