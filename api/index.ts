@@ -1,4 +1,3 @@
-import { Readable } from "stream";
 import pick from "../util/pick";
 import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
@@ -6,32 +5,42 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
 
-function arrayBufferToStream(arrayBuffer: ArrayBuffer) {
-  return new Readable({
-    read() {
-      this.push(Buffer.from(arrayBuffer));
-      this.push(null);
-    },
+function convertHeadersToObject(headers: Headers) {
+  const result = {};
+  headers.forEach((value, key) => {
+    result[key] = value;
   });
+  return result;
 }
 
-function patchContentSecurity(headers: Headers, host: string) {
+function patchContentSecurity(
+  headers: Record<string, string | number>,
+  host: string,
+) {
   const finalHeaders = {};
 
   const hostWithProtocol = "https://" + host;
 
-  for (const [name, value] of new Headers(headers)) {
-    if (/content-security-policy/i.test(name)) {
-      const patchedValue = stripMixedContentCSP(value)
-        .replace("img-src", `img-src ${hostWithProtocol}`)
-        .replace("default-src", `default-src ${hostWithProtocol}`)
-        .replace("connect-src", `connect-src ${hostWithProtocol}`);
+  for (const name in headers) {
+    switch (true) {
+      case /content-security-policy/i.test(name):
+        const patchedValue = stripMixedContentCSP(headers[name] as string)
+          .replace("img-src", `img-src ${hostWithProtocol}`)
+          .replace("default-src", `default-src ${hostWithProtocol}`)
+          .replace("connect-src", `connect-src ${hostWithProtocol}`);
 
-      finalHeaders[name] = patchedValue;
-    } else {
-      finalHeaders[name] = value;
+        finalHeaders[name] = patchedValue;
+        break;
+      // case /access-control-allow-origin/i.test(name):
+      //   finalHeaders[name] = "*";
+      //   break;
+      default:
+        finalHeaders[name] = headers[name];
     }
   }
+
+  finalHeaders["access-control-allow-origin"] = "*";
+  finalHeaders["cross-origin-resource-policy"] = "cross-origin";
 
   return finalHeaders;
 }
@@ -111,7 +120,10 @@ async function handler(event: HandlerEvent) {
       return {
         statusCode: 200,
         body: Buffer.from(data).toString("base64"),
-        headers: patchContentSecurity(headers, event.headers.host),
+        headers: patchContentSecurity(
+          convertHeadersToObject(headers),
+          event.headers.host,
+        ),
         isBase64Encoded: true,
       };
     }
@@ -135,7 +147,7 @@ async function handler(event: HandlerEvent) {
       body: body,
       isBase64Encoded: true,
       headers: patchContentSecurity(
-        { ...headers, ...compressedHeaders },
+        { ...convertHeadersToObject(headers), ...compressedHeaders },
         event.headers.host,
       ),
     };
@@ -238,7 +250,10 @@ export default async function (
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log("Bypassing... Size: ", data.byteLength);
 
-      const finalHeaders = patchContentSecurity(headers, request.headers.host);
+      const finalHeaders = patchContentSecurity(
+        convertHeadersToObject(headers),
+        request.headers.host,
+      );
 
       for (const header in finalHeaders) {
         response.setHeader(header, finalHeaders[header]);
@@ -262,7 +277,7 @@ export default async function (
     // let body = output.toString("base64");
 
     const finalHeaders = patchContentSecurity(
-      { ...headers, ...compressedHeaders },
+      { ...convertHeadersToObject(headers), ...compressedHeaders },
       request.headers.host,
     );
 
@@ -271,13 +286,6 @@ export default async function (
     }
 
     response.status(200).send(output);
-
-    // return {
-    //   statusCode: 200,
-    //   body: body,
-    //   isBase64Encoded: true,
-    //   headers: { ...headers, ...compressedHeaders },
-    // };
   } catch (error) {
     console.error(error);
     return { statusCode: 500, body: error.message || "" };
