@@ -112,10 +112,16 @@ async function handler(event: HandlerEvent) {
       requestHeaders,
     );
 
-    const originalSize = data.byteLength;
+    let originalSize = 0;
+
+    try {
+      originalSize = data.byteLength;
+    } catch (e) {
+      console.log("Error getting original size for url: ", url, e.message);
+    }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
-      console.log("Bypassing... Size: ", data.byteLength);
+      console.log("Bypassing... Size: ", originalSize);
 
       return {
         statusCode: 200,
@@ -245,10 +251,16 @@ export default async function (
 
     const { data, type, headers } = await fetchData(url, requestHeaders);
 
-    const originalSize = data.byteLength;
+    let originalSize = 0;
+
+    try {
+      originalSize = data.byteLength;
+    } catch (e) {
+      console.log("Error getting original size for url: ", url, e.message);
+    }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
-      console.log("Bypassing... Size: ", data.byteLength);
+      console.log("Bypassing... Size: ", originalSize);
 
       const finalHeaders = patchContentSecurity(
         convertHeadersToObject(headers),
