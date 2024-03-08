@@ -118,6 +118,16 @@ async function handler(event: HandlerEvent) {
       originalSize = data.byteLength;
     } catch (e) {
       console.log("Error getting original size for url: ", url, e.message);
+
+      return {
+        statusCode: 200,
+        body: Buffer.from(data).toString("base64"),
+        headers: patchContentSecurity(
+          convertHeadersToObject(headers),
+          event.headers.host,
+        ),
+        isBase64Encoded: true,
+      };
     }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
@@ -257,6 +267,17 @@ export default async function (
       originalSize = data.byteLength;
     } catch (e) {
       console.log("Error getting original size for url: ", url, e.message);
+
+      const finalHeaders = patchContentSecurity(
+        convertHeadersToObject(headers),
+        request.headers.host,
+      );
+
+      for (const header in finalHeaders) {
+        response.setHeader(header, finalHeaders[header]);
+      }
+
+      return response.status(200).send(Buffer.from(data));
     }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
