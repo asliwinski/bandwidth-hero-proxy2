@@ -133,13 +133,22 @@ async function handler(event: HandlerEvent) {
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
 
+      const processedHeaders = patchContentSecurity(
+        convertHeadersToObject(headers),
+        event.headers.host,
+      );
+
+      if (type.includes("svg")) {
+        processedHeaders["content-encoding"] = "identity";
+        delete processedHeaders["content-length"];
+      }
+
+      const body = Buffer.from(data).toString("base64");
+
       return {
         statusCode: 200,
-        body: Buffer.from(data).toString("base64"),
-        headers: patchContentSecurity(
-          convertHeadersToObject(headers),
-          event.headers.host,
-        ),
+        body,
+        headers: processedHeaders,
         isBase64Encoded: true,
       };
     }
@@ -289,6 +298,14 @@ export default async function (
       );
 
       for (const header in finalHeaders) {
+        if (type.includes("svg")) {
+          if (header === "content-length") continue;
+
+          if (header === "content-encoding") {
+            response.setHeader("content-encoding", "identity");
+            continue;
+          }
+        }
         response.setHeader(header, finalHeaders[header]);
       }
 
