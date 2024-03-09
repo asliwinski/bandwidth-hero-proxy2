@@ -11,6 +11,10 @@ function shouldCompress(
     return false;
   }
 
+  if (imageType.includes("svg")) {
+    return false;
+  }
+
   // Check if the size is zero
   if (size === 0) {
     return false;

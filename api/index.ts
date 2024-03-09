@@ -131,7 +131,7 @@ async function handler(event: HandlerEvent) {
     }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
-      console.log("Bypassing... Size: ", originalSize);
+      console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
 
       return {
         statusCode: 200,
@@ -281,7 +281,7 @@ export default async function (
     }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
-      console.log("Bypassing... Size: ", originalSize);
+      console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
 
       const finalHeaders = patchContentSecurity(
         convertHeadersToObject(headers),
