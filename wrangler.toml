@@ -3,6 +3,6 @@
 #
 # wrangler bundles imported .wasm files automatically (built-in **/*.wasm rule),
 # so the @jsquash codec binaries are inlined into the Worker.
-name = "image-lite-proxy"
+name = "image-lite-backend"
 main = "worker.ts"
 compatibility_date = "2024-09-23"

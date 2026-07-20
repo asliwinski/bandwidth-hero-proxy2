@@ -38,7 +38,7 @@ npm run dev:cf      # local dev
 npm run deploy:cf   # deploy (needs `wrangler login` once)
 ```
 
-The endpoint is `https://image-lite-proxy.<your-subdomain>.workers.dev`.
+The endpoint is `https://image-lite-backend.<your-subdomain>.workers.dev`.
 
 Then, in the **Data Compression Service** of the extension (or the `proxies` list in the
 Image Lite extension's `background.js`), point at whichever endpoint you deployed.
