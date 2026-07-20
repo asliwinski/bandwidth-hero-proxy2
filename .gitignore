@@ -3,5 +3,7 @@ node_modules
 .env
 yarn-error.log
 
-# Local Netlify folder
-.netlify
+# Cloudflare Workers / wrangler
+.wrangler
+.wrangler-dryrun
+dist-worker

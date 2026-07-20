@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["api", "util", "tests"]
+  "include": ["api", "util", "tests", "worker.ts", "wasm.d.ts"]
 }

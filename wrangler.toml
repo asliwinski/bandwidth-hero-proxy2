@@ -1,0 +1,8 @@
+# Cloudflare Workers config for the edge deployment of the proxy.
+# Vercel ignores this file; it only builds api/. Deploy with `npm run deploy:cf`.
+#
+# wrangler bundles imported .wasm files automatically (built-in **/*.wasm rule),
+# so the @jsquash codec binaries are inlined into the Worker.
+name = "image-lite-proxy"
+main = "worker.ts"
+compatibility_date = "2024-09-23"

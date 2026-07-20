@@ -4,18 +4,23 @@
   "description": "Data compression service that converts images to low-res WebP or JPEG on the fly. Used in Bandwidth-Hero browser extension.",
   "license": "MIT",
   "scripts": {
-    "start": "ntl dev",
-    "test": "jest"
+    "test": "jest",
+    "dev:cf": "wrangler dev",
+    "deploy:cf": "wrangler deploy"
   },
   "dependencies": {
     "sharp": "^0.35.3"
   },
   "devDependencies": {
-    "@netlify/functions": "^5.3.0",
+    "@cloudflare/workers-types": "^5.20260719.1",
+    "@jsquash/jpeg": "^1.6.0",
+    "@jsquash/png": "^3.1.1",
+    "@jsquash/webp": "^1.5.0",
     "@types/jest": "^30.0.0",
     "jest": "^30.4.2",
     "prettier": "^3.2.5",
     "ts-jest": "^29.1.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "^4.112.0"
   }
 }

@@ -16,11 +16,32 @@ It downloads original image and transforms it with [Sharp](https://github.com/lo
 
 ## Deployment
 
-You need to deploy the functions to Netlify:
+This repo can deploy to two runtimes from the same codebase. Shared, runtime-agnostic
+logic lives in `util/` (`extractTargetUrl`, `shouldCompress`, `headers`); only the image
+encoder differs, because `sharp` needs native `libvips`.
 
-[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/himshim/bandwidth-hero-proxy2)
+### Vercel (Node + sharp)
 
-Then, in the **Data Compression Service** in Bandwidth Hero extension, add `https://your-netlify-domain.netlify.app/api/index`, and you are good to go.
+`api/index.ts` is a Vercel serverless function that compresses with `sharp`. Connect the
+repo to Vercel and it deploys automatically; the endpoint is
+`https://<your-project>.vercel.app/api/index`.
+
+### Cloudflare Workers (edge + WASM)
+
+`worker.ts` is a Cloudflare Worker. `sharp` can't run in the Workers runtime, so it encodes
+with the [`@jsquash`](https://github.com/jamsinclair/jSquash) WASM codecs
+(`util/compressWasm.ts`) instead. It decodes JPEG/PNG/WebP and re-encodes to WebP/JPEG.
+
+```sh
+npm install
+npm run dev:cf      # local dev
+npm run deploy:cf   # deploy (needs `wrangler login` once)
+```
+
+The endpoint is `https://image-lite-proxy.<your-subdomain>.workers.dev`.
+
+Then, in the **Data Compression Service** of the extension (or the `proxies` list in the
+Image Lite extension's `background.js`), point at whichever endpoint you deployed.
 
 <!-- READ THIS ARTICLE LATER AdityaG
 Check out [this guide](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-node-js-application-for-production-on-ubuntu-16-04)
