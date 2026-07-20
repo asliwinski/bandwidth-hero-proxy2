@@ -5,15 +5,17 @@
   "license": "MIT",
   "scripts": {
     "start": "ntl dev",
-    "test": "jest tests/index.test.js"
+    "test": "jest"
   },
   "dependencies": {
-    "jest": "^27.4.5",
     "sharp": "^0.32.6"
   },
   "devDependencies": {
     "@netlify/functions": "^2.6.0",
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
     "prettier": "^3.2.5",
+    "ts-jest": "^29.1.2",
     "typescript": "^5.3.3"
   }
 }
