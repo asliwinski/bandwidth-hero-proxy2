@@ -1,6 +1,7 @@
 import pick from "../util/pick";
 import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
+import extractTargetUrl from "../util/extractTargetUrl";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import type { HandlerEvent } from "@netlify/functions";
@@ -49,36 +50,14 @@ function stripMixedContentCSP(CSPHeader: string) {
   return CSPHeader.replace("block-all-mixed-content", "");
 }
 
-function assembleURL(baseURL, queryParams) {
-  const url = new URL(baseURL);
-
-  Object.keys(queryParams).forEach((key) => {
-    url.searchParams.append(key, queryParams[key]);
-  });
-
-  return url.toString();
-}
-
 async function handler(event: HandlerEvent) {
-  let { url, ...rest } = event.queryStringParameters;
+  // Read the target URL verbatim from the raw query string so the image's own
+  // query params (signatures, sizing, etc.) survive intact. See extractTargetUrl.
+  let url = extractTargetUrl(event.rawQuery);
 
   // If no URL provided, return a default response
   if (!url) {
     return { statusCode: 200, body: "bandwidth-hero-proxy" };
-  }
-
-  if (rest) {
-    url = assembleURL(url, rest);
-  }
-
-  // Parse URL if it's in JSON format
-  try {
-    url = JSON.parse(url);
-  } catch {}
-
-  // If URL is an array, join it with "&url="
-  if (Array.isArray(url)) {
-    url = url.join("&url=");
   }
 
   // Replace specific pattern in the URL
@@ -218,27 +197,15 @@ export default async function (
   request: VercelRequest,
   response: VercelResponse,
 ) {
-  let { url, ...rest } = request.query;
+  // request.url is the path + raw query (e.g. "/api/index?url=https://..."), so
+  // read the target URL verbatim from it rather than the parsed request.query,
+  // which splits and re-encodes the image's own query string. See extractTargetUrl.
+  const rawQuery = request.url?.split("?").slice(1).join("?");
+  let url = extractTargetUrl(rawQuery);
 
   // If no URL provided, return a default response
   if (!url) {
     return response.status(200).send("bandwidth-hero-proxy");
-  }
-
-  if (rest) {
-    url = assembleURL(url, rest);
-  }
-
-  // Parse URL if it's in JSON format
-  try {
-    if (typeof url === "string") {
-      url = JSON.parse(url);
-    }
-  } catch {}
-
-  // If URL is an array, join it with "&url="
-  if (Array.isArray(url)) {
-    url = url.join("&url=");
   }
 
   // Replace specific pattern in the URL
