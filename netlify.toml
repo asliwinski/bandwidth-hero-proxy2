@@ -1,5 +1,10 @@
+# Netlify builds functions from netlify/functions/ (NOT api/, which is Vercel's
+# and whose default export would be mistaken for a v2 function). sharp is marked
+# external so Netlify installs its native binary instead of bundling it.
 [functions]
-    directory = "api/"
+    directory = "netlify/functions"
+    node_bundler = "esbuild"
+    external_node_modules = ["sharp"]
 
 [[redirects]]
     from = "/api/*"
