@@ -3,6 +3,7 @@ import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
 import extractTargetUrl from "../util/extractTargetUrl";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { HandlerEvent } from "@netlify/functions";
 
 function convertHeadersToObject(headers: Headers) {
   const result = {};
@@ -200,5 +201,101 @@ export default async function (
   } catch (error) {
     console.error(error);
     return response.status(500).send(error.message || "");
+  }
+}
+
+// Netlify Functions (v1) entry point. Same behavior as the Vercel handler above,
+// but in the Lambda-style request/response shape Netlify expects. Netlify uses
+// this `handler` export; Vercel uses the default export.
+export async function handler(event: HandlerEvent) {
+  let url = extractTargetUrl(event.rawQuery);
+
+  if (!url) {
+    return { statusCode: 200, body: "bandwidth-hero-proxy" };
+  }
+
+  url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
+
+  let useWebp = false;
+  let grayscale = true;
+  let quality = 40;
+
+  if (
+    event.headers["x-image-lite-bw"] &&
+    event.headers["x-image-lite-level"] &&
+    event.headers["x-image-lite-jpeg"]
+  ) {
+    useWebp = event.headers["x-image-lite-jpeg"] === "0";
+    grayscale = event.headers["x-image-lite-bw"] !== "0";
+    quality = parseInt(event.headers["x-image-lite-level"], 10) || 40;
+  }
+
+  try {
+    const requestHeaders = pick(event.headers, [
+      "cookie",
+      "dnt",
+      "referer",
+      "user-agent",
+      "x-forwarded-for",
+    ]);
+
+    const { data, type, headers } = await fetchData(url, requestHeaders);
+    if (!data) {
+      return { statusCode: 502, body: "" };
+    }
+
+    const originalSize = data.byteLength;
+
+    // Return the original image (base64) with proxied headers.
+    const sendOriginal = () => {
+      const finalHeaders = patchContentSecurity(
+        convertHeadersToObject(headers),
+        event.headers.host,
+      );
+      if (typeof type === "string" && type.includes("svg")) {
+        finalHeaders["content-encoding"] = "identity";
+        delete finalHeaders["content-length"];
+      }
+      return {
+        statusCode: 200,
+        body: Buffer.from(data).toString("base64"),
+        isBase64Encoded: true,
+        headers: finalHeaders,
+      };
+    };
+
+    if (!shouldCompress(type, originalSize, useWebp)) {
+      console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
+      return sendOriginal();
+    }
+
+    let output;
+    let compressedHeaders;
+    try {
+      ({ output, compressedHeaders } = await compressData(
+        data,
+        useWebp,
+        grayscale,
+        quality,
+        originalSize,
+      ));
+    } catch (err) {
+      // e.g. .ico, which sharp can't decode — return the original.
+      console.error("Compression failed, returning original:", err.message);
+      return sendOriginal();
+    }
+
+    return {
+      statusCode: 200,
+      body: output.toString("base64"),
+      isBase64Encoded: true,
+      headers: patchContentSecurity(
+        { ...convertHeadersToObject(headers), ...compressedHeaders },
+        event.headers.host,
+      ),
+    };
+  } catch (error) {
+    console.error(error);
+    return { statusCode: 500, body: error.message || "" };
   }
 }
