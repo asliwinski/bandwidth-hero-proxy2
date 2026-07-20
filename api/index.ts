@@ -4,8 +4,6 @@ import compress from "../util/compress";
 import extractTargetUrl from "../util/extractTargetUrl";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-import type { HandlerEvent } from "@netlify/functions";
-
 function convertHeadersToObject(headers: Headers) {
   const result = {};
   headers.forEach((value, key) => {
@@ -50,117 +48,6 @@ function stripMixedContentCSP(CSPHeader: string) {
   return CSPHeader.replace("block-all-mixed-content", "");
 }
 
-async function handler(event: HandlerEvent) {
-  // Read the target URL verbatim from the raw query string so the image's own
-  // query params (signatures, sizing, etc.) survive intact. See extractTargetUrl.
-  let url = extractTargetUrl(event.rawQuery);
-
-  // If no URL provided, return a default response
-  if (!url) {
-    return { statusCode: 200, body: "bandwidth-hero-proxy" };
-  }
-
-  // Replace specific pattern in the URL
-  url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
-
-  let useWebp = false;
-  let grayscale = true;
-  let quality = 40;
-
-  if (
-    event.headers["x-image-lite-bw"] &&
-    event.headers["x-image-lite-level"] &&
-    event.headers["x-image-lite-jpeg"]
-  ) {
-    useWebp = event.headers["x-image-lite-jpeg"] === "0";
-    grayscale = event.headers["x-image-lite-bw"] !== "0";
-    quality = parseInt(event.headers["x-image-lite-level"], 10) || 40;
-  }
-
-  try {
-    let requestHeaders = pick(event.headers, [
-      "cookie",
-      "dnt",
-      "referer",
-      "user-agent",
-      "x-forwarded-for",
-    ]);
-
-    const { data, type, headers, response } = await fetchData(
-      url,
-      requestHeaders,
-    );
-
-    let originalSize = 0;
-
-    try {
-      originalSize = data.byteLength;
-    } catch (e) {
-      console.log("Error getting original size for url: ", url, e.message);
-
-      return {
-        statusCode: 200,
-        body: Buffer.from(data).toString("base64"),
-        headers: patchContentSecurity(
-          convertHeadersToObject(headers),
-          event.headers.host,
-        ),
-        isBase64Encoded: true,
-      };
-    }
-
-    if (!shouldCompress(type, originalSize, useWebp)) {
-      console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
-
-      const processedHeaders = patchContentSecurity(
-        convertHeadersToObject(headers),
-        event.headers.host,
-      );
-
-      if (type.includes("svg")) {
-        processedHeaders["content-encoding"] = "identity";
-        delete processedHeaders["content-length"];
-      }
-
-      const body = Buffer.from(data).toString("base64");
-
-      return {
-        statusCode: 200,
-        body,
-        headers: processedHeaders,
-        isBase64Encoded: true,
-      };
-    }
-
-    const { output, compressedHeaders } = await compressData(
-      data,
-      useWebp,
-      grayscale,
-      quality,
-      originalSize,
-    );
-
-    console.log(
-      `From ${originalSize}, To ${output.length}, Saved: ${(((originalSize - output.length) * 100) / originalSize).toFixed(0)}%`,
-    );
-
-    let body = output.toString("base64");
-
-    return {
-      statusCode: 200,
-      body: body,
-      isBase64Encoded: true,
-      headers: patchContentSecurity(
-        { ...convertHeadersToObject(headers), ...compressedHeaders },
-        event.headers.host,
-      ),
-    };
-  } catch (error) {
-    console.error(error);
-    return { statusCode: 500, body: error.message || "" };
-  }
-}
-
 async function fetchData(url: string, headers: Headers) {
   const response = await fetch(url, { headers });
   if (!response.ok) {
@@ -192,7 +79,6 @@ async function compressData(
   return { output, compressedHeaders: headers };
 }
 
-export { handler };
 export default async function (
   request: VercelRequest,
   response: VercelResponse,
@@ -290,8 +176,6 @@ export default async function (
     console.log(
       `From ${originalSize}, To ${output.length}, Saved: ${(((originalSize - output.length) * 100) / originalSize).toFixed(0)}%`,
     );
-
-    // let body = output.toString("base64");
 
     const finalHeaders = patchContentSecurity(
       { ...convertHeadersToObject(headers), ...compressedHeaders },
