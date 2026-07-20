@@ -79,6 +79,35 @@ async function compressData(
   return { output, compressedHeaders: headers };
 }
 
+// Send the original (unmodified) image with the proxy's headers — used when the
+// image shouldn't be compressed or compression fails.
+function sendOriginal(
+  response: VercelResponse,
+  data,
+  type: string,
+  headers: Headers,
+  host: string,
+) {
+  const finalHeaders = patchContentSecurity(
+    convertHeadersToObject(headers),
+    host,
+  );
+  const isSvg = typeof type === "string" && type.includes("svg");
+
+  for (const header in finalHeaders) {
+    if (isSvg) {
+      if (header === "content-length") continue;
+      if (header === "content-encoding") {
+        response.setHeader("content-encoding", "identity");
+        continue;
+      }
+    }
+    response.setHeader(header, finalHeaders[header]);
+  }
+
+  return response.status(200).send(Buffer.from(data));
+}
+
 export default async function (
   request: VercelRequest,
   response: VercelResponse,
@@ -129,49 +158,30 @@ export default async function (
       originalSize = data.byteLength;
     } catch (e) {
       console.log("Error getting original size for url: ", url, e.message);
-
-      const finalHeaders = patchContentSecurity(
-        convertHeadersToObject(headers),
-        request.headers.host,
-      );
-
-      for (const header in finalHeaders) {
-        response.setHeader(header, finalHeaders[header]);
-      }
-
-      return response.status(200).send(Buffer.from(data));
+      return sendOriginal(response, data, type, headers, request.headers.host);
     }
 
     if (!shouldCompress(type, originalSize, useWebp)) {
       console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
-
-      const finalHeaders = patchContentSecurity(
-        convertHeadersToObject(headers),
-        request.headers.host,
-      );
-
-      for (const header in finalHeaders) {
-        if (type.includes("svg")) {
-          if (header === "content-length") continue;
-
-          if (header === "content-encoding") {
-            response.setHeader("content-encoding", "identity");
-            continue;
-          }
-        }
-        response.setHeader(header, finalHeaders[header]);
-      }
-
-      return response.status(200).send(Buffer.from(data));
+      return sendOriginal(response, data, type, headers, request.headers.host);
     }
 
-    const { output, compressedHeaders } = await compressData(
-      data,
-      useWebp,
-      grayscale,
-      quality,
-      originalSize,
-    );
+    let output;
+    let compressedHeaders;
+    try {
+      ({ output, compressedHeaders } = await compressData(
+        data,
+        useWebp,
+        grayscale,
+        quality,
+        originalSize,
+      ));
+    } catch (err) {
+      // The proxy couldn't decode/encode this image (e.g. .ico, which sharp
+      // can't read) — return the original instead of a 500 / broken image.
+      console.error("Compression failed, returning original:", err.message);
+      return sendOriginal(response, data, type, headers, request.headers.host);
+    }
 
     console.log(
       `From ${originalSize}, To ${output.length}, Saved: ${(((originalSize - output.length) * 100) / originalSize).toFixed(0)}%`,
@@ -189,6 +199,6 @@ export default async function (
     response.status(200).send(output);
   } catch (error) {
     console.error(error);
-    return { statusCode: 500, body: error.message || "" };
+    return response.status(500).send(error.message || "");
   }
 }
