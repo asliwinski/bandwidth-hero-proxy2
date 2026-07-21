@@ -7,3 +7,6 @@ yarn-error.log
 .wrangler
 .wrangler-dryrun
 dist-worker
+
+# Editor
+.idea/

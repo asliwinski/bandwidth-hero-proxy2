@@ -2,7 +2,7 @@ import pick from "../util/pick";
 import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
 import extractTargetUrl from "../util/extractTargetUrl";
-import extractMaxWidth from "../util/extractMaxWidth";
+import extractOptions from "../util/extractOptions";
 import resolveFormat from "../util/resolveFormat";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { HandlerEvent } from "@netlify/functions";
@@ -122,7 +122,7 @@ export default async function (
   // which splits and re-encodes the image's own query string. See extractTargetUrl.
   const rawQuery = request.url?.split("?").slice(1).join("?");
   let url = extractTargetUrl(rawQuery);
-  const maxWidth = extractMaxWidth(rawQuery);
+  const opts = extractOptions(rawQuery);
 
   // If no URL provided, return a default response
   if (!url) {
@@ -132,24 +132,24 @@ export default async function (
   // Replace specific pattern in the URL
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  let format = "jpeg";
-  let grayscale = true;
-  let quality = 40;
-
-  if (
-    request.headers["x-image-lite-bw"] &&
-    request.headers["x-image-lite-level"] &&
-    (request.headers["x-image-lite-format"] ||
-      request.headers["x-image-lite-jpeg"])
-  ) {
-    format = resolveFormat(
+  // Options come from the URL (cache-key-friendly); fall back to the legacy
+  // x-image-lite-* headers for older extension clients, then to defaults.
+  const maxWidth = opts.maxWidth;
+  const format =
+    opts.format ??
+    resolveFormat(
       request.headers["x-image-lite-format"] as string,
       request.headers["x-image-lite-jpeg"] as string,
     );
-    grayscale = request.headers["x-image-lite-bw"] !== "0";
-    quality =
-      parseInt(request.headers["x-image-lite-level"] as string, 10) || 40;
-  }
+  const quality =
+    opts.quality ||
+    parseInt(request.headers["x-image-lite-level"] as string, 10) ||
+    40;
+  const grayscale =
+    opts.grayscale ??
+    (request.headers["x-image-lite-bw"] != null
+      ? request.headers["x-image-lite-bw"] !== "0"
+      : true);
 
   try {
     let requestHeaders = pick(request.headers, [
@@ -219,7 +219,7 @@ export default async function (
 // this `handler` export; Vercel uses the default export.
 export async function handler(event: HandlerEvent) {
   let url = extractTargetUrl(event.rawQuery);
-  const maxWidth = extractMaxWidth(event.rawQuery);
+  const opts = extractOptions(event.rawQuery);
 
   if (!url) {
     return { statusCode: 200, body: "bandwidth-hero-proxy" };
@@ -227,22 +227,21 @@ export async function handler(event: HandlerEvent) {
 
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  let format = "jpeg";
-  let grayscale = true;
-  let quality = 40;
-
-  if (
-    event.headers["x-image-lite-bw"] &&
-    event.headers["x-image-lite-level"] &&
-    (event.headers["x-image-lite-format"] || event.headers["x-image-lite-jpeg"])
-  ) {
-    format = resolveFormat(
+  // URL options first (cache-key-friendly), then legacy headers, then defaults.
+  const maxWidth = opts.maxWidth;
+  const format =
+    opts.format ??
+    resolveFormat(
       event.headers["x-image-lite-format"],
       event.headers["x-image-lite-jpeg"],
     );
-    grayscale = event.headers["x-image-lite-bw"] !== "0";
-    quality = parseInt(event.headers["x-image-lite-level"], 10) || 40;
-  }
+  const quality =
+    opts.quality || parseInt(event.headers["x-image-lite-level"], 10) || 40;
+  const grayscale =
+    opts.grayscale ??
+    (event.headers["x-image-lite-bw"] != null
+      ? event.headers["x-image-lite-bw"] !== "0"
+      : true);
 
   try {
     const requestHeaders = pick(event.headers, [
