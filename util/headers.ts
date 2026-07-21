@@ -9,7 +9,18 @@ export const FORWARDED_REQUEST_HEADERS = [
   "referer",
   "user-agent",
   "x-forwarded-for",
+  // Data Saver: origins that honor it serve smaller images to begin with.
+  "save-data",
 ] as const;
+
+// Accept header we send to the origin. Many CDNs serve a compact WebP to clients
+// that advertise support and a much larger legacy JPEG to those that don't — and
+// a bare server-side fetch sends no Accept, so we'd get the fat JPEG (then waste
+// a round-trip re-compressing it, sometimes to more bytes than the browser would
+// have gotten directly). Advertising WebP makes the origin hand us the small
+// modern variant. WebP (not AVIF) because both backends decode it and every
+// target browser renders it, so passthrough is always safe.
+export const ORIGIN_ACCEPT = "image/webp,image/*,*/*";
 
 /** True if the header name is a Content-Security-Policy header (any variant). */
 export function isCspHeader(name: string): boolean {
