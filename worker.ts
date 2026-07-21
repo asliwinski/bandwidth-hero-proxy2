@@ -4,6 +4,7 @@
 // sharp, since native libvips can't run in the Workers runtime.
 
 import extractTargetUrl from "./util/extractTargetUrl";
+import extractMaxWidth from "./util/extractMaxWidth";
 import shouldCompress from "./util/shouldCompress";
 import compressWasm, { canCompress } from "./util/compressWasm";
 import {
@@ -48,6 +49,7 @@ export default {
     // string (signatures, sizing) survives intact. See util/extractTargetUrl.
     const rawQuery = request.url.split("?").slice(1).join("?");
     let url = extractTargetUrl(rawQuery);
+    const maxWidth = extractMaxWidth(rawQuery);
 
     if (!url) {
       return new Response("bandwidth-hero-proxy", { status: 200 });
@@ -107,6 +109,7 @@ export default {
           useWebp,
           grayscale,
           quality,
+          maxWidth,
         );
 
         const saved = originalSize - data.byteLength;

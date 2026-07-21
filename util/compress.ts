@@ -7,14 +7,21 @@ async function compress(
   grayscale: boolean,
   quality: number,
   originalSize: number,
+  maxWidth: number = 0,
 ) {
   // Determine the output format based on the useWebp flag
   const format = useWebp ? "webp" : "jpeg";
 
   try {
+    // Resize down to maxWidth (preserving aspect ratio, never enlarging) before
+    // encoding, so a webmaster's oversized image doesn't ship full-resolution.
+    const pipeline = sharp(imagePath).grayscale(grayscale);
+    if (maxWidth > 0) {
+      pipeline.resize({ width: maxWidth, withoutEnlargement: true });
+    }
+
     // Use Sharp library to compress the image
-    const { data, info } = await sharp(imagePath)
-      .grayscale(grayscale)
+    const { data, info } = await pipeline
       .toFormat(format, { quality, progressive: true, optimizeScans: true })
       .toBuffer({ resolveWithObject: true });
 

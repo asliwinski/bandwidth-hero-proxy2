@@ -14,12 +14,14 @@ import decodePng, { init as initPngDec } from "@jsquash/png/decode";
 import decodeWebp, { init as initWebpDec } from "@jsquash/webp/decode";
 import encodeWebp, { init as initWebpEnc } from "@jsquash/webp/encode";
 import encodeJpeg, { init as initJpegEnc } from "@jsquash/jpeg/encode";
+import resize, { initResize } from "@jsquash/resize";
 
 import JPEG_DEC_WASM from "@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm";
 import JPEG_ENC_WASM from "@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm";
 import PNG_WASM from "@jsquash/png/codec/pkg/squoosh_png_bg.wasm";
 import WEBP_DEC_WASM from "@jsquash/webp/codec/dec/webp_dec.wasm";
 import WEBP_ENC_WASM from "@jsquash/webp/codec/enc/webp_enc_simd.wasm";
+import RESIZE_WASM from "@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm";
 
 // Memoize each codec's init() so concurrent requests share a single
 // instantiation instead of re-initializing the WASM module every call.
@@ -84,8 +86,9 @@ export interface CompressResult {
 }
 
 /**
- * Decode → (optional grayscale) → encode. Mirrors util/compress.ts:
- * `useWebp` picks WebP vs JPEG output, `quality` is the encoder quality (1-100).
+ * Decode → (optional resize) → (optional grayscale) → encode. Mirrors
+ * util/compress.ts: `useWebp` picks WebP vs JPEG output, `quality` is the
+ * encoder quality (1-100), `maxWidth` caps the width (downscale only, 0 = off).
  */
 export default async function compressWasm(
   buffer: ArrayBuffer,
@@ -93,8 +96,17 @@ export default async function compressWasm(
   useWebp: boolean,
   grayscale: boolean,
   quality: number,
+  maxWidth: number = 0,
 ): Promise<CompressResult> {
-  const image = await decode(buffer, type);
+  let image = await decode(buffer, type);
+
+  // Downscale to maxWidth (preserving aspect ratio, never enlarging) before
+  // encoding, so an oversized source doesn't ship at full resolution.
+  if (maxWidth > 0 && image.width > maxWidth) {
+    const height = Math.max(1, Math.round((image.height * maxWidth) / image.width));
+    await ensureInit("resize", () => initResize(RESIZE_WASM));
+    image = await resize(image, { width: maxWidth, height });
+  }
 
   if (grayscale) toGrayscale(image);
 
