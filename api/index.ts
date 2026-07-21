@@ -160,16 +160,14 @@ export default async function (
       "x-forwarded-for",
     ]);
 
-    const { data, type, headers } = await fetchData(url, requestHeaders);
-
-    let originalSize = 0;
-
-    try {
-      originalSize = data.byteLength;
-    } catch (e) {
-      console.log("Error getting original size for url: ", url, e.message);
-      return sendOriginal(response, data, type, headers, request.headers.host);
+    const fetched = await fetchData(url, requestHeaders);
+    if (!fetched.data) {
+      // Origin fetch failed (e.g. a CDN that blocks datacenter fetches) — return
+      // its status instead of crashing on the missing body.
+      return response.status(fetched.statusCode || 502).send("");
     }
+    const { data, type, headers } = fetched;
+    const originalSize = data.byteLength;
 
     if (!shouldCompress(type, originalSize, format !== "jpeg")) {
       console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
@@ -252,10 +250,11 @@ export async function handler(event: HandlerEvent) {
       "x-forwarded-for",
     ]);
 
-    const { data, type, headers } = await fetchData(url, requestHeaders);
-    if (!data) {
-      return { statusCode: 502, body: "" };
+    const fetched = await fetchData(url, requestHeaders);
+    if (!fetched.data) {
+      return { statusCode: fetched.statusCode || 502, body: "" };
     }
+    const { data, type, headers } = fetched;
 
     const originalSize = data.byteLength;
 
