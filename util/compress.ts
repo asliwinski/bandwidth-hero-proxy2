@@ -3,14 +3,14 @@ import sharp from "sharp";
 
 async function compress(
   imagePath: string,
-  useWebp: boolean,
+  format: string,
   grayscale: boolean,
   quality: number,
   originalSize: number,
   maxWidth: number = 0,
 ) {
-  // Determine the output format based on the useWebp flag
-  const format = useWebp ? "webp" : "jpeg";
+  const outputFormat =
+    format === "avif" || format === "jpeg" ? format : "webp";
 
   try {
     // Resize down to maxWidth (preserving aspect ratio, never enlarging) before
@@ -20,16 +20,17 @@ async function compress(
       pipeline.resize({ width: maxWidth, withoutEnlargement: true });
     }
 
-    // Use Sharp library to compress the image
+    // Use Sharp library to compress the image (progressive/optimizeScans apply
+    // to JPEG; sharp ignores them for WebP/AVIF).
     const { data, info } = await pipeline
-      .toFormat(format, { quality, progressive: true, optimizeScans: true })
+      .toFormat(outputFormat, { quality, progressive: true, optimizeScans: true })
       .toBuffer({ resolveWithObject: true });
 
     // Calculate saved bytes and prepare headers
     const bytesSaved = originalSize - info.size;
     const headers = {
       "cache-control": "max-age=2592000",
-      "content-type": `image/${format}`,
+      "content-type": `image/${outputFormat}`,
       "content-length": info.size,
       "x-original-size": originalSize,
       "x-bytes-saved": bytesSaved,

@@ -5,6 +5,7 @@
 
 import extractTargetUrl from "./util/extractTargetUrl";
 import extractMaxWidth from "./util/extractMaxWidth";
+import resolveFormat from "./util/resolveFormat";
 import shouldCompress from "./util/shouldCompress";
 import compressWasm, { canCompress } from "./util/compressWasm";
 import {
@@ -58,14 +59,15 @@ export default {
     url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
     // Compression settings from the extension's headers. Defaults match compress.ts.
-    let useWebp = false;
+    let format = "jpeg";
     let grayscale = true;
     let quality = 40;
     const bw = request.headers.get("x-image-lite-bw");
     const level = request.headers.get("x-image-lite-level");
+    const fmt = request.headers.get("x-image-lite-format");
     const jpeg = request.headers.get("x-image-lite-jpeg");
-    if (bw && level && jpeg) {
-      useWebp = jpeg === "0";
+    if (bw && level && (fmt || jpeg)) {
+      format = resolveFormat(fmt, jpeg);
       grayscale = bw !== "0";
       quality = parseInt(level, 10) || 40;
     }
@@ -97,7 +99,10 @@ export default {
       const originalSize = buffer.byteLength;
       const isSvg = type.includes("svg");
 
-      if (!canCompress(type) || !shouldCompress(type, originalSize, useWebp)) {
+      if (
+        !canCompress(type) ||
+        !shouldCompress(type, originalSize, format !== "jpeg")
+      ) {
         console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
         return passthroughImage(buffer, originResponse.headers, host, isSvg);
       }
@@ -106,7 +111,7 @@ export default {
         const { data, contentType } = await compressWasm(
           buffer,
           type,
-          useWebp,
+          format,
           grayscale,
           quality,
           maxWidth,

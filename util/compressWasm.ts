@@ -87,13 +87,16 @@ export interface CompressResult {
 
 /**
  * Decode → (optional resize) → (optional grayscale) → encode. Mirrors
- * util/compress.ts: `useWebp` picks WebP vs JPEG output, `quality` is the
+ * util/compress.ts: `format` is "webp" | "jpeg" | "avif", `quality` is the
  * encoder quality (1-100), `maxWidth` caps the width (downscale only, 0 = off).
+ *
+ * The edge has no AVIF encoder (too heavy for the Workers CPU/bundle budget), so
+ * "avif" falls back to WebP here — AVIF is served by the sharp backends.
  */
 export default async function compressWasm(
   buffer: ArrayBuffer,
   type: string,
-  useWebp: boolean,
+  format: string,
   grayscale: boolean,
   quality: number,
   maxWidth: number = 0,
@@ -112,11 +115,12 @@ export default async function compressWasm(
 
   const q = Math.min(100, Math.max(1, Math.round(quality) || 40));
 
-  if (useWebp) {
-    await ensureInit("webpEnc", () => initWebpEnc(WEBP_ENC_WASM));
-    return { data: await encodeWebp(image, { quality: q }), contentType: "image/webp" };
+  if (format === "jpeg") {
+    await ensureInit("jpegEnc", () => initJpegEnc(JPEG_ENC_WASM));
+    return { data: await encodeJpeg(image, { quality: q }), contentType: "image/jpeg" };
   }
 
-  await ensureInit("jpegEnc", () => initJpegEnc(JPEG_ENC_WASM));
-  return { data: await encodeJpeg(image, { quality: q }), contentType: "image/jpeg" };
+  // webp, or avif (which the edge can't encode) → webp.
+  await ensureInit("webpEnc", () => initWebpEnc(WEBP_ENC_WASM));
+  return { data: await encodeWebp(image, { quality: q }), contentType: "image/webp" };
 }
