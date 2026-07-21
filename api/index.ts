@@ -192,6 +192,13 @@ export default async function (
       return sendOriginal(response, data, type, headers, request.headers.host);
     }
 
+    // Already-optimized images can come out LARGER after re-encoding. Never send
+    // back more bytes than we received — return the original instead.
+    if (output.length >= originalSize) {
+      console.log(`No gain (${originalSize} -> ${output.length}); sending original`);
+      return sendOriginal(response, data, type, headers, request.headers.host);
+    }
+
     console.log(
       `From ${originalSize}, To ${output.length}, Saved: ${(((originalSize - output.length) * 100) / originalSize).toFixed(0)}%`,
     );
@@ -295,6 +302,13 @@ export async function handler(event: HandlerEvent) {
     } catch (err) {
       // e.g. .ico, which sharp can't decode — return the original.
       console.error("Compression failed, returning original:", err.message);
+      return sendOriginal();
+    }
+
+    // Already-optimized images can come out LARGER after re-encoding. Never send
+    // back more bytes than we received — return the original instead.
+    if (output.length >= originalSize) {
+      console.log(`No gain (${originalSize} -> ${output.length}); sending original`);
       return sendOriginal();
     }
 
