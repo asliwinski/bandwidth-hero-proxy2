@@ -2,6 +2,7 @@ import pick from "../util/pick";
 import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
 import extractTargetUrl from "../util/extractTargetUrl";
+import extractMaxWidth from "../util/extractMaxWidth";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { HandlerEvent } from "@netlify/functions";
 
@@ -65,6 +66,7 @@ async function compressData(
   grayscale: boolean,
   quality: number,
   originalSize: number,
+  maxWidth: number,
 ) {
   const { err, output, headers } = await compress(
     data,
@@ -72,6 +74,7 @@ async function compressData(
     grayscale,
     quality,
     originalSize,
+    maxWidth,
   );
   if (err) {
     console.log("Conversion failed");
@@ -118,6 +121,7 @@ export default async function (
   // which splits and re-encodes the image's own query string. See extractTargetUrl.
   const rawQuery = request.url?.split("?").slice(1).join("?");
   let url = extractTargetUrl(rawQuery);
+  const maxWidth = extractMaxWidth(rawQuery);
 
   // If no URL provided, return a default response
   if (!url) {
@@ -176,6 +180,7 @@ export default async function (
         grayscale,
         quality,
         originalSize,
+        maxWidth,
       ));
     } catch (err) {
       // The proxy couldn't decode/encode this image (e.g. .ico, which sharp
@@ -209,6 +214,7 @@ export default async function (
 // this `handler` export; Vercel uses the default export.
 export async function handler(event: HandlerEvent) {
   let url = extractTargetUrl(event.rawQuery);
+  const maxWidth = extractMaxWidth(event.rawQuery);
 
   if (!url) {
     return { statusCode: 200, body: "bandwidth-hero-proxy" };
@@ -278,6 +284,7 @@ export async function handler(event: HandlerEvent) {
         grayscale,
         quality,
         originalSize,
+        maxWidth,
       ));
     } catch (err) {
       // e.g. .ico, which sharp can't decode — return the original.
