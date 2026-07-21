@@ -4,7 +4,7 @@
 // sharp, since native libvips can't run in the Workers runtime.
 
 import extractTargetUrl from "./util/extractTargetUrl";
-import extractMaxWidth from "./util/extractMaxWidth";
+import extractOptions from "./util/extractOptions";
 import resolveFormat from "./util/resolveFormat";
 import shouldCompress from "./util/shouldCompress";
 import compressWasm, { canCompress } from "./util/compressWasm";
@@ -50,7 +50,7 @@ export default {
     // string (signatures, sizing) survives intact. See util/extractTargetUrl.
     const rawQuery = request.url.split("?").slice(1).join("?");
     let url = extractTargetUrl(rawQuery);
-    const maxWidth = extractMaxWidth(rawQuery);
+    const opts = extractOptions(rawQuery);
 
     if (!url) {
       return new Response("bandwidth-hero-proxy", { status: 200 });
@@ -58,19 +58,21 @@ export default {
 
     url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-    // Compression settings from the extension's headers. Defaults match compress.ts.
-    let format = "jpeg";
-    let grayscale = true;
-    let quality = 40;
+    // Options from the URL (cache-key-friendly); fall back to the legacy
+    // x-image-lite-* headers for older clients, then defaults.
     const bw = request.headers.get("x-image-lite-bw");
-    const level = request.headers.get("x-image-lite-level");
-    const fmt = request.headers.get("x-image-lite-format");
-    const jpeg = request.headers.get("x-image-lite-jpeg");
-    if (bw && level && (fmt || jpeg)) {
-      format = resolveFormat(fmt, jpeg);
-      grayscale = bw !== "0";
-      quality = parseInt(level, 10) || 40;
-    }
+    const maxWidth = opts.maxWidth;
+    const format =
+      opts.format ??
+      resolveFormat(
+        request.headers.get("x-image-lite-format"),
+        request.headers.get("x-image-lite-jpeg"),
+      );
+    const quality =
+      opts.quality ||
+      parseInt(request.headers.get("x-image-lite-level") || "", 10) ||
+      40;
+    const grayscale = opts.grayscale ?? (bw != null ? bw !== "0" : true);
 
     const host = new URL(request.url).host;
 
