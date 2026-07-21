@@ -3,6 +3,7 @@ import shouldCompress from "../util/shouldCompress";
 import compress from "../util/compress";
 import extractTargetUrl from "../util/extractTargetUrl";
 import extractMaxWidth from "../util/extractMaxWidth";
+import resolveFormat from "../util/resolveFormat";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { HandlerEvent } from "@netlify/functions";
 
@@ -62,7 +63,7 @@ async function fetchData(url: string, headers: Headers) {
 
 async function compressData(
   data,
-  useWebp: boolean,
+  format: string,
   grayscale: boolean,
   quality: number,
   originalSize: number,
@@ -70,7 +71,7 @@ async function compressData(
 ) {
   const { err, output, headers } = await compress(
     data,
-    useWebp,
+    format,
     grayscale,
     quality,
     originalSize,
@@ -131,16 +132,20 @@ export default async function (
   // Replace specific pattern in the URL
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  let useWebp = false;
+  let format = "jpeg";
   let grayscale = true;
   let quality = 40;
 
   if (
     request.headers["x-image-lite-bw"] &&
     request.headers["x-image-lite-level"] &&
-    request.headers["x-image-lite-jpeg"]
+    (request.headers["x-image-lite-format"] ||
+      request.headers["x-image-lite-jpeg"])
   ) {
-    useWebp = request.headers["x-image-lite-jpeg"] === "0";
+    format = resolveFormat(
+      request.headers["x-image-lite-format"] as string,
+      request.headers["x-image-lite-jpeg"] as string,
+    );
     grayscale = request.headers["x-image-lite-bw"] !== "0";
     quality =
       parseInt(request.headers["x-image-lite-level"] as string, 10) || 40;
@@ -166,7 +171,7 @@ export default async function (
       return sendOriginal(response, data, type, headers, request.headers.host);
     }
 
-    if (!shouldCompress(type, originalSize, useWebp)) {
+    if (!shouldCompress(type, originalSize, format !== "jpeg")) {
       console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
       return sendOriginal(response, data, type, headers, request.headers.host);
     }
@@ -176,7 +181,7 @@ export default async function (
     try {
       ({ output, compressedHeaders } = await compressData(
         data,
-        useWebp,
+        format,
         grayscale,
         quality,
         originalSize,
@@ -222,16 +227,19 @@ export async function handler(event: HandlerEvent) {
 
   url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  let useWebp = false;
+  let format = "jpeg";
   let grayscale = true;
   let quality = 40;
 
   if (
     event.headers["x-image-lite-bw"] &&
     event.headers["x-image-lite-level"] &&
-    event.headers["x-image-lite-jpeg"]
+    (event.headers["x-image-lite-format"] || event.headers["x-image-lite-jpeg"])
   ) {
-    useWebp = event.headers["x-image-lite-jpeg"] === "0";
+    format = resolveFormat(
+      event.headers["x-image-lite-format"],
+      event.headers["x-image-lite-jpeg"],
+    );
     grayscale = event.headers["x-image-lite-bw"] !== "0";
     quality = parseInt(event.headers["x-image-lite-level"], 10) || 40;
   }
@@ -270,7 +278,7 @@ export async function handler(event: HandlerEvent) {
       };
     };
 
-    if (!shouldCompress(type, originalSize, useWebp)) {
+    if (!shouldCompress(type, originalSize, format !== "jpeg")) {
       console.log(`Bypassing... Size: ${originalSize}, type: ${type}`);
       return sendOriginal();
     }
@@ -280,7 +288,7 @@ export async function handler(event: HandlerEvent) {
     try {
       ({ output, compressedHeaders } = await compressData(
         data,
-        useWebp,
+        format,
         grayscale,
         quality,
         originalSize,
