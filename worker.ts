@@ -120,6 +120,17 @@ export default {
         );
 
         const saved = originalSize - data.byteLength;
+
+        // Already-optimized images (e.g. a small, well-tuned JPEG) can come out
+        // LARGER after re-encoding. Never send back more bytes than we received —
+        // pass the original through instead.
+        if (data.byteLength >= originalSize) {
+          console.log(
+            `No gain (${originalSize} -> ${data.byteLength}); sending original`,
+          );
+          return passthroughImage(buffer, originResponse.headers, host, isSvg);
+        }
+
         console.log(
           `From ${originalSize}, To ${data.byteLength}, Saved: ${((saved * 100) / originalSize).toFixed(0)}%`,
         );
