@@ -4,6 +4,7 @@ import compress from "../util/compress";
 import extractTargetUrl from "../util/extractTargetUrl";
 import extractOptions from "../util/extractOptions";
 import resolveFormat from "../util/resolveFormat";
+import { ORIGIN_ACCEPT } from "../util/headers";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { HandlerEvent } from "@netlify/functions";
 
@@ -158,7 +159,10 @@ export default async function (
       "referer",
       "user-agent",
       "x-forwarded-for",
+      "save-data",
     ]);
+    // Ask the origin for WebP so we don't get handed a fat legacy JPEG.
+    requestHeaders["accept"] = ORIGIN_ACCEPT;
 
     const fetched = await fetchData(url, requestHeaders);
     if (!fetched.data) {
@@ -255,7 +259,10 @@ export async function handler(event: HandlerEvent) {
       "referer",
       "user-agent",
       "x-forwarded-for",
+      "save-data",
     ]);
+    // Ask the origin for WebP so we don't get handed a fat legacy JPEG.
+    requestHeaders["accept"] = ORIGIN_ACCEPT;
 
     const fetched = await fetchData(url, requestHeaders);
     if (!fetched.data) {

@@ -10,6 +10,7 @@ import shouldCompress from "./util/shouldCompress";
 import compressWasm, { canCompress } from "./util/compressWasm";
 import {
   FORWARDED_REQUEST_HEADERS,
+  ORIGIN_ACCEPT,
   isCspHeader,
   patchCspValue,
 } from "./util/headers";
@@ -83,6 +84,8 @@ export default {
         const value = request.headers.get(name);
         if (value) originHeaders.set(name, value);
       }
+      // Ask the origin for WebP so we don't get handed a fat legacy JPEG.
+      originHeaders.set("accept", ORIGIN_ACCEPT);
 
       const originResponse = await fetch(url, { headers: originHeaders });
 
